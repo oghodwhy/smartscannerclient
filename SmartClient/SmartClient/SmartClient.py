@@ -19,7 +19,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv,"v")
     except getopt.GetoptError:
-        print ('Error with input options.\n Try in the form SmartClient.py %targetip%\n Use -h for help.\n')
+        print ('Error with input options.\n Try in the form SmartClient.py %targetaddress%\n Use -h for help.\n')
         sys.exit(2)
 
     #Check input options
@@ -35,6 +35,11 @@ def main(argv):
         if param == '-v':
             verbose = True
             print ('Starting client in verbose mode.\n')
+
+    #if no entered args
+    if not (args):
+        print ('No input address!\n Try in the form SmartClient.py %targetaddress%\n Use -h for help.\n')
+        sys.exit(2)
 
     if (verbose): print ('Initiating main...')
 
