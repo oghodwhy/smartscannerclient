@@ -262,6 +262,78 @@ def getHostVersion(hostname = str()):
     version = '2.0'
     return version
     
+# getCookies
+#
+# Sends a HTTP request to specified host with specified version and returns a list of cookies.
+#
+# Takes name of host, and highest HTTP version. Returns a tuple of two lists, cookies and ccorresponding domains.
+def getCookies(hostname = str(), version = '1.0'):
+
+    request10 = parseToGet('http',version,hostname,'Connection: close')
+    cookies = list()
+    domains = list()
+
+    #create socket
+    try:    
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    except socket.error:
+        print ('Client error. Failed to create socket.')
+        sys.exit(2)
+    
+    #Send request to host  
+    if (verbose): print ('Sending request to host...')
+
+    try:
+        sock.connect((hostname, 80))
+        sock.sendall(str.encode(request10))
+        newMessage = recvMessage(sock)
+        sock.close()
+    
+    #message failure
+    except socket.error:
+        if (verbose): print ('Connection with host failed.')
+        print ('Failed to get cookies!')
+        return [list(),list()]
+
+    #check if message was successful
+    if (verbose): print ('Recieved response from host.')
+    code = checkStatus(newMessage)
+    
+    #handle failure codes or invalid HTTP response
+    if code.startswith('5') or code.startswith('4') or not code:
+        if (verbose): print ('Response produced bad status.')
+        print ('Failed to get cookies!')
+        return [list(),list()]
+
+    #For lines in the HTTP response, scan for cookie lines.
+    if (verbose): print ('Scanning response for cookie lines...')
+    for line in newMessage:
+
+        #for cookie lines
+        if line.startswith('Set-Cookie:') or line.startswith('Cookie:'):
+            splitLine = line.split()
+            name = 'not found'
+            domain = 'not found'
+
+            #find and isolate cookie name and domain
+            for word in splitLine:
+                
+                if word.startswith('name='):
+                    target = word.split('=')
+                    name = target[1]
+                elif word.startswith('domain='):
+                    target = word.split('=')
+                    domain = target[1]
+            
+            #append name and domain to list
+            if (verbose): print ('Cookie line discovered with name: ' + name + ' and domain: ' + domain)
+            cookies.append(name)
+            domains.append(domain)
+    
+    if (verbose): print ('Finished scanning for cookies.')
+    return [cookies,domains]
+    
 # Main   
 # 
 # Main function of Smart Client. Takes input of command line arguments.   
@@ -502,7 +574,21 @@ def main(argv):
         if (verbose): print ('Host supports up to version ' + version)
         hostInfo[2] = version
             
-    
+    #find cookies    
+    while(true):
+        if (verbose): print ("Checking for cookies from host...")
+        
+        #check we can connect to host
+        if not hostInfo[1]:
+            if (verbose): print ("Cannot check for cookies without HTTP.")
+            break
+            
+        #check cookies
+        [cookieList,cookieDomains] = getCookies(hostInfo[0],hostInfo[1])
+        
+        if (verbose): print ("Finished cooky check.")
+        break
+
     #Print Result
     while (true):
         if (verbose): print ('Printing results...')
@@ -540,7 +626,7 @@ def main(argv):
         break
     
     #Close sockets
-    if (verbose): print ("Closing Sockets.")
+    if (verbose): print ("Final socket close for insurance.")
     secureSocket.close()
     regularSocket.close()
     
