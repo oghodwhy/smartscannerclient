@@ -184,16 +184,26 @@ def getHostVersion(hostname = str()):
     request10 = parseToGet('http','1.0',hostname,'Connection: close')
     request11 = parseToGet('http','1.1',hostname,'Connection: close')
     request20 = parseToGet('http','2.0',hostname,'Connection: close')
-        
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((hostname, 80))
+    
+    try:    
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    except socket.error:
+        print ('Client error. Failed to create socket.')
+        sys.exit(2)
     
     #testing for 1.0   
     if (verbose): print ('Checking response to HTTP 1.0...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request10))
-    newMessage = recvMessage(sock)
-    sock.close()
+
+    try:
+        sock.connect((hostname, 80))
+        sock.sendall(str.encode(request10))
+        newMessage = recvMessage(sock)
+        sock.close()
+
+    except socket.error:
+        if (verbose): print ('Connection with host failed.')
+
     code = checkStatus(newMessage)
 
     #check for failure
@@ -207,10 +217,16 @@ def getHostVersion(hostname = str()):
 
     #testing for 1.1   
     if (verbose): print ('Checking response to HTTP 1.1...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request11))
-    newMessage = recvMessage(sock)
-    sock.close()
+
+    try:
+        sock.connect((hostname, 80))
+        sock.sendall(str.encode(request11))
+        newMessage = recvMessage(sock)
+        sock.close()
+
+    except socket.error:
+        if (verbose): print ('Connection with host failed.')
+
     code = checkStatus(newMessage)
 
     #check for failure
@@ -224,10 +240,16 @@ def getHostVersion(hostname = str()):
 
     #try 2.0   
     if (verbose): print ('Checking response to HTTP 2.0...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request20))
-    newMessage = recvMessage(sock)
-    sock.close()
+
+    try:
+        sock.connect((hostname, 80))
+        sock.sendall(str.encode(request20))
+        newMessage = recvMessage(sock)
+        sock.close()
+
+    except socket.error:
+        if (verbose): print ('Connection with host failed.')
+
     code = checkStatus(newMessage)
 
     #check for failure
@@ -335,6 +357,7 @@ def main(argv):
 
         try:
             newMessage = recvMessage(secureSocket, newMessage)
+            secureSocket.close()
 
         #Recieving failure
         except socket.error:
@@ -374,7 +397,7 @@ def main(argv):
             
             #Redirect status
             elif code.startswith('3'):
-                if (verbose): print ('Recieved HTTP redirect. Following...')
+                if (verbose): print ('Recieved HTTP redirect. Checking...')
                 
                 secureRedirect = checkRedirect(newMessage)
 
@@ -382,7 +405,8 @@ def main(argv):
                 if secureRedirect:
                     if (verbose): print ('Recieved proper response over https!')
                     hostInfo[1] = 'HTTPS'
-                
+                    
+                    hostInfo[2] = getHostVersion(hostInfo[0])
                     #
                     # GET VERSION AND COOKIES
                     #
@@ -404,7 +428,6 @@ def main(argv):
                 hostInfo[1] = ''
                 break
 
-        
     #Attempt HTTP connection
     while(true):
 
@@ -449,18 +472,36 @@ def main(argv):
                 if (verbose): print ('Recieved message over HTTP')
                 if (verbose): print ('Recieved the following:\n' + newMessage)
                 
-                #
-                #PROCESS HTTPS RESPONSE
-                #
+                code = checkStatus(newMessage)
  
+                if code: 
+                    if (verbose): print ('Recieved valid response on HTTP. Host supports HTTP.')
+                    hostInfo[1] = 'HTTP'
 
-                hostInfo[1] = 'HTTP'
+                else:
+                    if (verbose): print ('Recieved invalid response on HTTP. Host does not support HTTP.')
+                    hostInfo[1] = ''
                 break
         
         #Already connected with HTTPS
         else:
-            if (verbose): print ('Already connected via HTTPS. No need to check with HTTP.')
+            if (verbose): print ('Host accepts HTTPS. No need to check with HTTP.')
             break
+
+    #check HTTP version
+    while(true):
+        if (verbose): print ('Checking host HTTP version...')
+
+        #if no HTTP
+        if not hostInfo[1]:
+            if (verbose): print ('Host supports no HTTP versions.')
+            break
+
+        #check version
+        version = getHostVersion(hostInfo[0])
+        if (verbose): print ('Host supports up to version ' + version)
+        hostInfo[2] = version
+            
     
     #Print Result
     while (true):
@@ -481,7 +522,7 @@ def main(argv):
             print('1. Support of HTTPS: No')
         
         #Report HTTP version
-        print('2. Newest version of HTTP supported: '+ HTTPversion)
+        print('2. Newest version of HTTP supported: '+ hostInfo[2])
 
         #Report Cookies
         print('3. List of cookies:')
