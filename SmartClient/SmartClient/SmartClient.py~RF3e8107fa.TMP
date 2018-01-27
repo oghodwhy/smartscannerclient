@@ -111,12 +111,12 @@ def validHTTP(message = list(str())):
     if(verbose): print('Not a valid HTTP response.')
     return False
 
-# checkStatus
+# parseForStatus
 #
 # Parses through a message to determine HTTP validity, and status code.
 #
 # Takes a message in the form of a list of strings. Returns a status code as a string.
-def checkStatus(message = list(str())):
+def parseForStatus(message = list(str())):
     if(verbose): print('Parsing Message for HTTP status code...')
     
     #if it's valid HTTP find and return status code.
@@ -133,12 +133,12 @@ def checkStatus(message = list(str())):
     
     return ''
 
-# checkRedirect
+# secureRedirect
 #
-# Checks a message to see if it redirects to an https site.
+# Checks a message to see if it is a legitimate HTTP response.
 #
 # Takes a list of strings as input. Returns a bool.
-def checkRedirect(message = list(str())):
+def secureRedirect(message = list(str())):
     if(verbose): print('Checking if redirect is to https site...')
     
     #if valid
@@ -157,9 +157,8 @@ def checkRedirect(message = list(str())):
 
         #check if redirect is to https
         else:
-            if(verbose): print('Found and checking location line...')
 
-            #redirects to https
+        #redirects to https
             if locationLine[1].startswith('https'):
                 if(verbose): print('Redirect is to https!')
                 return True
@@ -174,71 +173,6 @@ def checkRedirect(message = list(str())):
         if(verbose): print('Not a valid HTTP response.')
         return False
 
-# getHostVersion
-#
-# Repeatedly contacts host on set up socket verify HTTP versions.
-#
-# Takes name of host. Returns highest HTTP version. Probably.
-def getHostVersion(hostname = str()):
-    version = ''
-    request10 = parseToGet('http','1.0',hostname,'Connection: close')
-    request11 = parseToGet('http','1.1',hostname,'Connection: close')
-    request20 = parseToGet('http','2.0',hostname,'Connection: close')
-        
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((hostname, 80))
-    
-    #testing for 1.0   
-    if (verbose): print ('Checking response to HTTP 1.0...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request10))
-    newMessage = recvMessage(sock)
-    sock.close()
-    code = checkStatus(newMessage)
-
-    #check for failure
-    if code.startswith('5') or code.startswith('4') or not code:
-        if (verbose): print ('Failed HTTP 1.0 test.') 
-        return version
-    
-    #update version
-    if (verbose): print ('Passed 1.0 test.')
-    version = '1.0'
-
-    #testing for 1.1   
-    if (verbose): print ('Checking response to HTTP 1.1...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request11))
-    newMessage = recvMessage(sock)
-    sock.close()
-    code = checkStatus(newMessage)
-
-    #check for failure
-    if code.startswith('5') or code.startswith('4') or not code:
-        if (verbose): print ('Failed HTTP 1.1 test.') 
-        return version
-    
-    #update version
-    if (verbose): print ('Passed 1.1 test.')
-    version = '1.1'
-
-    #try 2.0   
-    if (verbose): print ('Checking response to HTTP 2.0...')
-    sock.connect((hostname, 80))
-    sock.sendall(str.encode(request20))
-    newMessage = recvMessage(sock)
-    sock.close()
-    code = checkStatus(newMessage)
-
-    #check for failure
-    if code.startswith('5') or code.startswith('4') or not code:
-        if (verbose): print ('Failed HTTP 2.0 test.') 
-        return version
-
-    #update version and return
-    if (verbose): print ('Passed 2.0 test.')
-    version = '2.0'
-    return version
     
 # Main   
 # 
@@ -353,7 +287,7 @@ def main(argv):
             if (verbose): print ('Recieved message over HTTPS')
             
             #Find status of response
-            code = checkStatus(newMessage)
+            code = parseForStatus(newMessage)
 
             #if invalid response
             if not code:
@@ -376,8 +310,12 @@ def main(argv):
             elif code.startswith('3'):
                 if (verbose): print ('Recieved HTTP redirect. Following...')
                 
-                secureRedirect = checkRedirect(newMessage)
-
+                redirectAddr = ''
+                secureRedirect = False
+                #
+                #CHECK REDIRECT
+                #
+                
                 #redirect works
                 if secureRedirect:
                     if (verbose): print ('Recieved proper response over https!')
